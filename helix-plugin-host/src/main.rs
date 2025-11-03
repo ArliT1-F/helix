@@ -42,8 +42,8 @@ async fn main() -> Result<()> {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
 
-    let service = LspService::new(|client| PluginHost::new(client, options.clone()));
-    Server::new(stdin, stdout, service).serve().await?;
+    let (service, socket) = LspService::new(|client| PluginHost::new(client, options.clone()));
+    Server::new(stdin, stdout, socket).serve(service).await;
 
     Ok(())
 }

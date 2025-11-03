@@ -1374,7 +1374,7 @@ impl Editor {
     ) -> Self {
         let mut language_servers = helix_lsp::Registry::new(syn_loader.clone());
         let conf = config.load();
-        let plugin_cfg = conf.load();
+        let plugin_cfg = conf.plugins.clone();
         let auto_pairs = (&conf.auto_pairs).into();
 
         let plugin_host = if plugin_cfg.enable {

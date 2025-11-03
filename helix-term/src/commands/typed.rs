@@ -7,6 +7,7 @@ use crate::job::Job;
 use super::*;
 
 use helix_core::command_line::{Args, Flag, Signature, Token, TokenKind};
+use helix_core::diagnostic::LanguageServerId;
 use helix_core::fuzzy::fuzzy_match;
 use helix_core::indent::MAX_INDENT;
 use helix_core::line_ending;
@@ -1596,7 +1597,7 @@ fn lsp_workspace_command(
         let command = args[0].to_string();
         let matches: Vec<_> = ls_id_commands
             .iter()
-            .filter(|(_, c)| *c == &command)
+            .filter(|(_, c)| *c == command)
             .map(|(ls_id, c)| (*ls_id, c.as_str()))
             .collect();
 

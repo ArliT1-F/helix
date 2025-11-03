@@ -98,7 +98,7 @@ impl PluginManager {
         self.commands.clear();
 
         let workspace_string = workspace_root
-            .and_then(|path| path.to_path_buf().canonicalize().ok())
+            .map(|path| path.to_path_buf())
             .map(|path| path.to_string_lossy().to_string());
 
         for entry in manifest.plugins {
@@ -252,17 +252,21 @@ impl LanguageServer for PluginHost {
         &self,
         params: lsp::ExecuteCommandParams,
     ) -> Result<Option<serde_json::Value>, RpcError> {
+        let lsp::ExecuteCommandParams {
+            command, arguments, ..
+        } = params;
+
         let binding = {
             let manager = self.manager.lock().await;
-            manager.lookup_command(&params.command)
+            manager.lookup_command(&command)
         }
-        .ok_or_else(|| method_not_found(&params.command))?;
+        .ok_or_else(|| method_not_found(&command))?;
 
         let response = binding
             .plugin
             .send_request(HostRequestPayload::Execute {
-                command: params.command.clone(),
-                arguments: params.arguments.unwrap_or_default(),
+                command: command.clone(),
+                arguments,
             })
             .await
             .map_err(internal_error)?;
@@ -280,7 +284,7 @@ impl LanguageServer for PluginHost {
 fn internal_error(err: impl ToString) -> RpcError {
     RpcError {
         code: ErrorCode::InternalError,
-        message: err.to_string(),
+        message: err.to_string().into(),
         data: None,
     }
 }
@@ -288,7 +292,7 @@ fn internal_error(err: impl ToString) -> RpcError {
 fn method_not_found(command: &str) -> RpcError {
     RpcError {
         code: ErrorCode::MethodNotFound,
-        message: format!("command `{command}` not registered"),
+        message: format!("command `{command}` not registered").into(),
         data: None,
     }
 }
