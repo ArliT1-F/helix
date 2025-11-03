@@ -290,6 +290,10 @@ args = ["start", "--stdio"]
 command = "kcl-language-server"
 args = ["server", "--stdio"]
 
+[language-server.helix-plugin-host]
+command = "workspaces/helix/helix-plugin-host/target/release/helix-plugin-host"
+args = ["--verbose"]
+
 [[language]]
 name = "rust"
 scope = "source.rust"
@@ -304,7 +308,7 @@ block-comment-tokens = [
   { start = "/**", end = "*/" },
   { start = "/*!", end = "*/" },
 ]
-language-servers = [ "rust-analyzer" ]
+language-servers = [ "rust-analyzer", "helix-plugin-host" ]
 indent = { tab-width = 4, unit = "    " }
 persistent-diagnostic-sources = ["rustc", "clippy"]
 

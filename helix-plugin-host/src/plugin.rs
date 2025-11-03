@@ -3,7 +3,7 @@ use anyhow::{anyhow, Context, Result};
 use helix_plugin_sdk::protocol::{
     HostRequest, HostRequestPayload, MessageLevel, PluginEvent, PluginMessage, PluginResponse,
 };
-use parking_lot::Mutex as ParkingMutex;
+use tokio::sync::Mutex as ParkingMutex;
 use std::{
     collections::HashMap,
     ffi::OsString,
@@ -143,7 +143,7 @@ impl PluginProcess {
     /// Issue a shutdown request to the plugin and wait for process termination.
     pub async fn shutdown(&self) -> Result<()> {
         let _ = self.send_request(HostRequestPayload::Shutdown).await;
-        let mut child = self.inner.child.lock();
+        let mut child = self.inner.child.lock().await;
         if let Some(mut child) = child.take() {
             let _ = child.wait().await;
         }
@@ -197,12 +197,14 @@ impl PluginProcess {
 
 impl Drop for PluginProcessInner {
     fn drop(&mut self) {
-        if let Some(mut child) = self.child.lock().take() {
-            if let Err(err) = child.start_kill() {
-                log::warn!(
-                    "failed to terminate plugin `{}` during drop: {err}",
-                    self.name
-                );
+        if let Ok(mut child_guard) = self.child.try_lock() {
+            if let Some(mut child) = child_guard.take() {
+                if let Err(err) = child.start_kill() {
+                    log::warn!(
+                        "failed to terminate plugin `{}` during drop: {err}",
+                        self.name
+                    );
+                }
             }
         }
     }
