@@ -16,6 +16,8 @@ members = [
   "helix-plugin-sdk",
   "helix-plugin-host",
   "plugins/hello-plugin",
+  "plugins/github-pr-dashboard",
+  "plugins/task-runner",
   "xtask",
 ]
 
