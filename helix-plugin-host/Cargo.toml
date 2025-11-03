@@ -1,0 +1,24 @@
+[package]
+name = "helix-plugin-host"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Plugin runtime host for Helix, exposing plugins over LSP"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+env_logger = "0.11"
+futures = "0.3"
+helix-loader = { path = "../helix-loader" }
+helix-plugin-sdk = { path = "../helix-plugin-sdk" }
+log = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.38", features = ["process", "io-util", "macros", "rt-multi-thread", "sync", "time", "io-std"] }
+tokio-stream = { version = "0.1", features = ["io-util"] }
+tower-lsp = { version = "0.20", features = ["runtime-tokio"] }
+uuid = { version = "1.10", features = ["v4"] }
+toml = "0.9"

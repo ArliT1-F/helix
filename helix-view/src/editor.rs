@@ -373,6 +373,8 @@ pub struct Config {
     /// Search configuration.
     #[serde(default)]
     pub search: SearchConfig,
+    /// Plugin runtime configuration
+    pub plugins: PluginRuntimeConfig,
     pub lsp: LspConfig,
     pub terminal: Option<TerminalConfig>,
     /// Column numbers at which to draw the rulers. Defaults to `[]`, meaning no rulers.
@@ -509,6 +511,27 @@ pub fn get_terminal_provider() -> Option<TerminalConfig> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
+pub struct PluginRuntimeConfig {
+    /// Enables the experimental plugin runtime host.
+    pub enable: bool,
+    /// Override the plugin host binary. Defaults to `helix-plugin-host` in `$PATH`.
+    pub host_command: Option<PathBuf>,
+    /// Path to a plugin manifest file. Defaults to `plugins.toml` in the Helix config directory.
+    pub manifest: Option<PathBuf>,
+}
+
+impl Default for PluginRuntimeConfig {
+    fn default() -> Self {
+        Self {
+            enable: false,
+            host_command: None,
+            manifest: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct LspConfig {
     /// Enables LSP
     pub enable: bool,
@@ -522,7 +545,7 @@ pub struct LspConfig {
     pub display_signature_help_docs: bool,
     /// Display inlay hints
     pub display_inlay_hints: bool,
-    /// Maximum displayed length of inlay hints (excluding the added trailing `…`).
+    /// Maximum displayed length of inlay hints (excluding the added trailing `?`).
     /// If it's `None`, there's no limit
     pub inlay_hints_length_limit: Option<NonZeroU8>,
     /// Display document color swatches
@@ -591,7 +614,7 @@ impl Default for StatusLineConfig {
                 E::Position,
                 E::FileEncoding,
             ],
-            separator: String::from("│"),
+            separator: String::from("?"),
             mode: ModeConfig::default(),
             diagnostics: vec![Severity::Warning, Severity::Error],
             workspace_diagnostics: vec![Severity::Warning, Severity::Error],
@@ -960,11 +983,11 @@ pub struct WhitespaceCharacters {
 impl Default for WhitespaceCharacters {
     fn default() -> Self {
         Self {
-            space: '·',   // U+00B7
-            nbsp: '⍽',    // U+237D
-            nnbsp: '␣',   // U+2423
-            tab: '→',     // U+2192
-            newline: '⏎', // U+23CE
+            space: '?',   // U+00B7
+            nbsp: '?',    // U+237D
+            nnbsp: '?',   // U+2423
+            tab: '?',     // U+2192
+            newline: '?', // U+23CE
             tabpad: ' ',
         }
     }
@@ -983,7 +1006,7 @@ impl Default for IndentGuidesConfig {
         Self {
             skip_levels: 0,
             render: false,
-            character: '│',
+            character: '?',
         }
     }
 }
@@ -1088,6 +1111,7 @@ impl Default for Config {
             true_color: false,
             undercurl: false,
             search: SearchConfig::default(),
+            plugins: PluginRuntimeConfig::default(),
             lsp: LspConfig::default(),
             terminal: get_terminal_provider(),
             rulers: Vec::new(),
@@ -1167,6 +1191,7 @@ pub struct Editor {
     pub macro_recording: Option<(char, Vec<KeyEvent>)>,
     pub macro_replaying: Vec<char>,
     pub language_servers: helix_lsp::Registry,
+    pub plugin_host: Option<Arc<helix_lsp::Client>>,
     pub diagnostics: Diagnostics,
     pub diff_providers: DiffProviderRegistry,
 
@@ -1285,6 +1310,61 @@ pub enum CloseError {
 }
 
 impl Editor {
+    fn launch_plugin_host(
+        language_servers: &mut helix_lsp::Registry,
+        cfg: &PluginRuntimeConfig,
+    ) -> Option<Arc<helix_lsp::Client>> {
+        use helix_lsp::Url;
+
+        let command_path = cfg
+            .host_command
+            .as_ref()
+            .map(|path| helix_stdx::path::expand_tilde(path).into_owned())
+            .unwrap_or_else(|| PathBuf::from("helix-plugin-host"));
+        let command = command_path.to_string_lossy().to_string();
+
+        let mut args = Vec::new();
+        if let Some(manifest) = cfg.manifest.as_ref() {
+            let manifest = helix_stdx::path::expand_tilde(manifest).into_owned();
+            args.push("--manifest".to_string());
+            args.push(manifest.to_string_lossy().to_string());
+        }
+
+        let mut environment = HashMap::new();
+        environment.insert(
+            "HELIX_CONFIG_DIR".into(),
+            helix_loader::config_dir().to_string_lossy().to_string(),
+        );
+        if let Some(runtime_dir) = helix_loader::runtime_dirs().first() {
+            environment.insert(
+                "HELIX_RUNTIME_DIR".into(),
+                runtime_dir.to_string_lossy().to_string(),
+            );
+        }
+
+        let (workspace_root, _) = helix_loader::find_workspace();
+        let root_path = helix_stdx::path::normalize(workspace_root);
+        let root_uri = Url::from_file_path(&root_path).ok();
+
+        match language_servers.start_external(
+            "helix-plugin-host".to_string(),
+            command,
+            args,
+            environment,
+            None,
+            root_path,
+            root_uri,
+            30,
+            false,
+        ) {
+            Ok(client) => Some(client),
+            Err(err) => {
+                log::error!("failed to launch plugin host: {err:?}");
+                None
+            }
+        }
+    }
+
     pub fn new(
         mut area: Rect,
         theme_loader: Arc<theme::Loader>,
@@ -1292,9 +1372,16 @@ impl Editor {
         config: Arc<dyn DynAccess<Config>>,
         handlers: Handlers,
     ) -> Self {
-        let language_servers = helix_lsp::Registry::new(syn_loader.clone());
+        let mut language_servers = helix_lsp::Registry::new(syn_loader.clone());
         let conf = config.load();
+        let plugin_cfg = conf.plugins.clone();
         let auto_pairs = (&conf.auto_pairs).into();
+
+        let plugin_host = if plugin_cfg.enable {
+            Self::launch_plugin_host(&mut language_servers, &plugin_cfg)
+        } else {
+            None
+        };
 
         // HAXX: offset the render area height by 1 to account for prompt/commandline
         area.height -= 1;
@@ -1313,6 +1400,7 @@ impl Editor {
             macro_replaying: Vec::new(),
             theme: theme_loader.default(),
             language_servers,
+            plugin_host,
             diagnostics: Diagnostics::new(),
             diff_providers: DiffProviderRegistry::default(),
             debug_adapters: dap::registry::Registry::new(),
@@ -1369,6 +1457,10 @@ impl Editor {
     /// Current editing mode for the [`Editor`].
     pub fn mode(&self) -> Mode {
         self.mode
+    }
+
+    pub fn plugin_host(&self) -> Option<&helix_lsp::Client> {
+        self.plugin_host.as_deref()
     }
 
     pub fn config(&self) -> DynGuard<Config> {

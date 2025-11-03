@@ -21,6 +21,7 @@ use tokio::sync::mpsc::UnboundedReceiver;
 
 use std::{
     collections::HashMap,
+    ffi::OsString,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -673,6 +674,58 @@ impl Registry {
         Some(Ok(client))
     }
 
+    pub fn start_external(
+        &mut self,
+        name: String,
+        command: String,
+        args: Vec<String>,
+        environment: HashMap<String, String>,
+        config: Option<serde_json::Value>,
+        root_path: PathBuf,
+        root_uri: Option<Url>,
+        timeout: u64,
+        enable_snippets: bool,
+    ) -> Result<Arc<Client>> {
+        let env_pairs: Vec<(OsString, OsString)> = environment
+            .into_iter()
+            .map(|(key, value)| (OsString::from(key), OsString::from(value)))
+            .collect();
+
+        let command_clone = command.clone();
+        let args_clone = args.clone();
+        let config_clone = config.clone();
+        let env_clone = env_pairs.clone();
+        let root_path_clone = root_path.clone();
+        let root_uri_clone = root_uri.clone();
+
+        let id = self.inner.try_insert_with_key(|id| {
+            start_process(
+                id,
+                name.clone(),
+                command_clone.clone(),
+                args_clone.clone(),
+                env_clone.clone(),
+                config_clone.clone(),
+                root_path_clone.clone(),
+                root_uri_clone.clone(),
+                timeout,
+                enable_snippets,
+            )
+            .map(|client| {
+                self.incoming.push(UnboundedReceiverStream::new(client.1));
+                client.0
+            })
+        })?;
+
+        let client = self.inner[id].clone();
+        self.inner_by_name
+            .entry(name)
+            .or_default()
+            .push(client.clone());
+
+        Ok(client)
+    }
+
     pub fn stop(&mut self, name: &str) {
         if let Some(clients) = self.inner_by_name.get_mut(name) {
             // Drain the clients vec so that the entry in `inner_by_name` remains
@@ -948,6 +1001,61 @@ fn start_client(
         // next up, notify<initialized>
         _client.notify::<lsp::notification::Initialized>(lsp::InitializedParams {});
 
+        initialize_notify.notify_one();
+    });
+
+    Ok(NewClient(client, incoming))
+}
+
+fn start_process(
+    id: LanguageServerId,
+    name: String,
+    command: String,
+    args: Vec<String>,
+    environment: Vec<(OsString, OsString)>,
+    config: Option<serde_json::Value>,
+    root_path: PathBuf,
+    root_uri: Option<Url>,
+    timeout: u64,
+    enable_snippets: bool,
+) -> Result<NewClient> {
+    let (client, incoming, initialize_notify) = Client::start(
+        &command,
+        &args,
+        config,
+        environment
+            .iter()
+            .map(|(key, value)| (key.as_os_str(), value.as_os_str())),
+        root_path,
+        root_uri,
+        id,
+        name.clone(),
+        timeout,
+    )?;
+
+    let client = Arc::new(client);
+
+    let _client = client.clone();
+    tokio::spawn(async move {
+        use futures_util::TryFutureExt;
+        let value = _client
+            .capabilities
+            .get_or_try_init(|| {
+                _client
+                    .initialize(enable_snippets)
+                    .map_ok(|response| response.capabilities)
+            })
+            .await;
+
+        if let Err(e) = value {
+            log::error!(
+                "failed to initialize language server `{}`: {e}",
+                _client.name()
+            );
+            return;
+        }
+
+        _client.notify::<lsp::notification::Initialized>(lsp::InitializedParams {});
         initialize_notify.notify_one();
     });
 
