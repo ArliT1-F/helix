@@ -1533,21 +1533,33 @@ fn lsp_workspace_command(
     }
 
     let doc = doc!(cx.editor);
-    let ls_id_commands = doc
+    let mut ls_id_commands: Vec<(LanguageServerId, String)> = doc
         .language_servers_with_feature(LanguageServerFeature::WorkspaceCommand)
         .flat_map(|ls| {
             ls.capabilities()
                 .execute_command_provider
                 .iter()
-                .flat_map(|options| options.commands.iter())
-                .map(|command| (ls.id(), command))
-        });
+                .flat_map(|options| options.commands.iter().cloned())
+                .map(move |command| (ls.id(), command))
+        })
+        .collect();
+
+    if let Some(host) = cx.editor.plugin_host() {
+        if host.is_initialized() {
+            if let Some(options) = host.capabilities().execute_command_provider.as_ref() {
+                for command in &options.commands {
+                    ls_id_commands.push((host.id(), command.clone()));
+                }
+            }
+        }
+    }
 
     if args.is_empty() {
         let commands = ls_id_commands
+            .iter()
             .map(|(ls_id, command)| {
                 (
-                    ls_id,
+                    *ls_id,
                     helix_lsp::lsp::Command {
                         title: command.clone(),
                         command: command.clone(),
@@ -1583,11 +1595,13 @@ fn lsp_workspace_command(
     } else {
         let command = args[0].to_string();
         let matches: Vec<_> = ls_id_commands
-            .filter(|(_ls_id, c)| *c == &command)
+            .iter()
+            .filter(|(_, c)| *c == &command)
+            .map(|(ls_id, c)| (*ls_id, c.as_str()))
             .collect();
 
         match matches.as_slice() {
-            [(ls_id, _command)] => {
+            [(ls_id, _)] => {
                 let arguments = args
                     .get(1)
                     .map(|rest| {

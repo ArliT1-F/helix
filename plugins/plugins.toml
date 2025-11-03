@@ -1,0 +1,7 @@
+[[plugin]]
+name = "github-pr-dashboard"
+command = "helix-github-pr-dashboard"
+
+[[plugin]]
+name = "task-runner"
+command = "helix-task-runner"

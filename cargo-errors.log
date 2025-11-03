@@ -1,0 +1,52 @@
+    Checking futures-util v0.3.31
+    Checking tokio-stream v0.1.17
+    Checking futures-executor v0.3.31
+    Checking helix-event v25.7.1 (/workspaces/helix/helix-event)
+    Checking helix-lsp v25.7.1 (/workspaces/helix/helix-lsp)
+    Checking helix-vcs v25.7.1 (/workspaces/helix/helix-vcs)
+    Checking helix-dap v25.7.1 (/workspaces/helix/helix-dap)
+    Checking helix-view v25.7.1 (/workspaces/helix/helix-view)
+error[E0599]: the method `load` exists for struct `DynGuard<Config>`, but its trait bounds were not satisfied
+    --> helix-view/src/editor.rs:1377:31
+     |
+294  | pub struct Config {
+     | ----------------- doesn't satisfy `<editor::Config as Deref>::Target = _`, `editor::Config: Deref`, `editor::Config: DynAccess<_>` or `editor::Config: arc_swap::access::Access<_>`
+...
+1377 |         let plugin_cfg = conf.load();
+     |                               ^^^^ method cannot be called on `DynGuard<Config>` due to unsatisfied trait bounds
+     |
+    ::: /home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/arc-swap-1.7.1/src/access.rs:188:1
+     |
+188  | pub struct DynGuard<T: ?Sized>(Box<dyn Deref<Target = T>>);
+     | ------------------------------ doesn't satisfy `DynGuard<editor::Config>: DynAccess<_>` or `_: Access<_>`
+     |
+     = note: the following trait bounds were not satisfied:
+             `DynGuard<editor::Config>: arc_swap::access::Access<_>`
+             which is required by `DynGuard<editor::Config>: DynAccess<_>`
+             `editor::Config: arc_swap::access::Access<_>`
+             which is required by `editor::Config: DynAccess<_>`
+             `<editor::Config as Deref>::Target = _`
+             which is required by `editor::Config: DynAccess<_>`
+             `editor::Config: Deref`
+             which is required by `editor::Config: DynAccess<_>`
+note: the traits `Deref` and `arc_swap::access::Access` must be implemented
+    --> /home/codespace/.rustup/toolchains/1.82.0-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/deref.rs:136:1
+     |
+136  | pub trait Deref {
+     | ^^^^^^^^^^^^^^^
+     |
+    ::: /home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/arc-swap-1.7.1/src/access.rs:101:1
+     |
+101  | pub trait Access<T> {
+     | ^^^^^^^^^^^^^^^^^^^
+     = help: items from traits can only be used if the trait is implemented and in scope
+     = note: the following traits define an item `load`, perhaps you need to implement one of them:
+             candidate #1: `DynAccess`
+             candidate #2: `arc_swap::access::Access`
+             candidate #3: `arc_swap::cache::Access`
+             candidate #4: `arc_swap::strategy::sealed::InnerStrategy`
+             candidate #5: `icu_provider::data_provider::DataProvider`
+             candidate #6: `signal_hook::iterator::exfiltrator::sealed::Exfiltrator`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `helix-view` (lib) due to 1 previous error

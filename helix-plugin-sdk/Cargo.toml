@@ -1,0 +1,16 @@
+[package]
+name = "helix-plugin-sdk"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Plugin SDK for the Helix plugin runtime"
+
+[dependencies]
+anyhow = "1.0"
+once_cell = "1.19"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror.workspace = true
+log = "0.4"

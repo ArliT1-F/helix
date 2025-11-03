@@ -1,0 +1,17 @@
+[package]
+name = "helix-github-pr-dashboard"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Helix plugin that surfaces GitHub pull requests for the current workspace"
+
+[dependencies]
+anyhow = "1.0"
+helix-plugin-sdk = { path = "../../helix-plugin-sdk" }
+reqwest = { version = "0.12", default-features = false, features = ["json", "blocking", "rustls-tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+url = "2.5"

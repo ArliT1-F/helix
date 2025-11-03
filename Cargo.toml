@@ -13,6 +13,9 @@ members = [
   "helix-vcs",
   "helix-parsec",
   "helix-stdx",
+  "helix-plugin-sdk",
+  "helix-plugin-host",
+  "plugins/hello-plugin",
   "xtask",
 ]
 
