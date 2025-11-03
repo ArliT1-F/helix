@@ -124,9 +124,13 @@ mod external {
                 Self::Pasteboard
             } else {
                 #[cfg(feature = "term")]
-                return Self::Termcode;
+                {
+                    Self::Termcode
+                }
                 #[cfg(not(feature = "term"))]
-                return Self::None;
+                {
+                    Self::None
+                }
             }
         }
 
@@ -163,10 +167,15 @@ mod external {
                 Self::Tmux
             } else if binary_exists("win32yank.exe") {
                 Self::Win32Yank
-            } else if cfg!(feature = "term") {
-                Self::Termcode
             } else {
-                Self::None
+                #[cfg(feature = "term")]
+                {
+                    Self::Termcode
+                }
+                #[cfg(not(feature = "term"))]
+                {
+                    Self::None
+                }
             }
         }
     }
