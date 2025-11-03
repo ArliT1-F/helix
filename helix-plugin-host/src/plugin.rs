@@ -212,21 +212,11 @@ async fn handle_event(inner: &PluginProcessInner, event: PluginEvent) {
     match event {
         PluginEvent::ShowMessage { level, message } => {
             let ty = map_message_level(level);
-            if let Err(err) = inner.client.show_message(ty, message.clone()).await {
-                log::warn!(
-                    "failed to deliver showMessage from plugin `{}`: {err}",
-                    inner.name
-                );
-            }
+            inner.client.show_message(ty, message).await;
         }
         PluginEvent::Log { level, message } => {
             let ty = map_message_level(level);
-            if let Err(err) = inner.client.log_message(ty, message.clone()).await {
-                log::warn!(
-                    "failed to deliver logMessage from plugin `{}`: {err}",
-                    inner.name
-                );
-            }
+            inner.client.log_message(ty, message).await;
         }
     }
 }
