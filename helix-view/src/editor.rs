@@ -545,7 +545,7 @@ pub struct LspConfig {
     pub display_signature_help_docs: bool,
     /// Display inlay hints
     pub display_inlay_hints: bool,
-    /// Maximum displayed length of inlay hints (excluding the added trailing `…`).
+    /// Maximum displayed length of inlay hints (excluding the added trailing `?`).
     /// If it's `None`, there's no limit
     pub inlay_hints_length_limit: Option<NonZeroU8>,
     /// Display document color swatches
@@ -614,7 +614,7 @@ impl Default for StatusLineConfig {
                 E::Position,
                 E::FileEncoding,
             ],
-            separator: String::from("│"),
+            separator: String::from("?"),
             mode: ModeConfig::default(),
             diagnostics: vec![Severity::Warning, Severity::Error],
             workspace_diagnostics: vec![Severity::Warning, Severity::Error],
@@ -983,11 +983,11 @@ pub struct WhitespaceCharacters {
 impl Default for WhitespaceCharacters {
     fn default() -> Self {
         Self {
-            space: '·',   // U+00B7
-            nbsp: '⍽',    // U+237D
-            nnbsp: '␣',   // U+2423
-            tab: '→',     // U+2192
-            newline: '⏎', // U+23CE
+            space: '?',   // U+00B7
+            nbsp: '?',    // U+237D
+            nnbsp: '?',   // U+2423
+            tab: '?',     // U+2192
+            newline: '?', // U+23CE
             tabpad: ' ',
         }
     }
@@ -1006,7 +1006,7 @@ impl Default for IndentGuidesConfig {
         Self {
             skip_levels: 0,
             render: false,
-            character: '│',
+            character: '?',
         }
     }
 }
